@@ -12,8 +12,11 @@ use tokio::{fs, net::TcpListener};
 const HTML_NOT_FOUND: &str = include_str!("../static/not-found.html");
 const HTML_INTERNAL_ERROR: &str = include_str!("../static/internal-error.html");
 
-const ALLOWED_IMAGE_TYPES: [&str; 5] = ["jpg", "png", "jpeg", "gif", "webp"];
-const ALLOWED_STATIC_TYPES: [&str; 2] = ["css", "js"];
+const ALLOWED_ASSETS_TYPES: [&str; 38] = [
+    "jpg", "png", "jpeg", "gif", "svg", "webp", "ico", "bmp", "tiff", "avif", "css", "js", "mjs",
+    "wasm", "ttf", "otf", "woff", "woff2", "eot", "mp3", "wav", "ogg", "m4a", "flac", "mp4",
+    "webm", "ogm", "mov", "zip", "tar", "gz", "rar", "7z", "pdf", "txt", "csv", "xml", "json",
+];
 
 pub async fn start_server(port: u16) -> Result<()> {
     let listener = TcpListener::bind(&format!("0.0.0.0:{port}"))
@@ -54,12 +57,7 @@ pub async fn handle_wildcard(Path(path): Path<String>) -> impl IntoResponse {
         .unwrap_or("html")
         .to_lowercase();
 
-    if ALLOWED_IMAGE_TYPES.contains(&extension.as_str()) {
-        println!("Serving media: {path}");
-        return serve_media(&path).await.into_response();
-    }
-
-    if ALLOWED_STATIC_TYPES.contains(&extension.as_str()) {
+    if ALLOWED_ASSETS_TYPES.contains(&extension.as_str()) {
         println!("Serving static: {path}");
         return serve_static(&path).await.into_response();
     }
@@ -108,36 +106,52 @@ async fn serve_static(path: &str) -> impl IntoResponse {
                 .unwrap_or("")
                 .to_lowercase();
             let mime_type = match ext.as_str() {
-                "js" => "application/javascript",
-                "css" => "text/css",
-                _ => "application/octet-stream",
-            };
-            (StatusCode::OK, [(header::CONTENT_TYPE, mime_type)], bytes).into_response()
-        }
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Html(HTML_INTERNAL_ERROR)).into_response(),
-    }
-}
-
-async fn serve_media(path: &str) -> impl IntoResponse {
-    let media_path = PathBuf::from("public/").join(path);
-
-    if !media_path.exists() {
-        return (StatusCode::NOT_FOUND, Html(HTML_NOT_FOUND)).into_response();
-    }
-
-    match fs::read(&media_path).await {
-        Ok(bytes) => {
-            let ext = media_path
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("png")
-                .to_lowercase();
-            let mime_type = match ext.as_str() {
-                "png" => "image/png",
+                // Images
                 "jpg" | "jpeg" => "image/jpeg",
+                "png" => "image/png",
                 "gif" => "image/gif",
+                "svg" => "image/svg",
                 "webp" => "image/webp",
-                _ => "image/png",
+                "ico" => "image/x-icon",
+                "bmp" => "image/bmp",
+                "tiff" => "image/tiff",
+                "avif" => "image/avif",
+
+                // Documents
+                "pdf" => "application/pdf",
+                "txt" => "text/plain",
+                "csv" => "text/csv",
+                "xml" => "application/xm",
+                "json" => "application/json",
+
+                // Web Assests
+                "css" => "text/css",
+                "js" => "application/javascript",
+                "mjs" => "application/javascript",
+                "wasm" => "application/wasm",
+
+                // Fonts
+                "ttf" => "font/ttf",
+                "otf" => "font/otf",
+                "woff" => "font/woff",
+                "woff2" => "font/woff2",
+                "eot" => "application/vnd.ms-fontobject",
+
+                // Audio
+                "mp3" => "audio/mpeg",
+                "wav" => "audio/wav",
+                "ogg" => "audio/ogg",
+                "m4a" => "audio/mp4",
+                "flac" => "audio/flac",
+
+                // Video
+                "mp4" => "video/mp4",
+                "webm" => "video/webm",
+                "ogm" => "video/ogg",
+                "mov" => "video/quicktime",
+
+                // If non of them matches
+                _ => "application/octet-stream",
             };
             (StatusCode::OK, [(header::CONTENT_TYPE, mime_type)], bytes).into_response()
         }
