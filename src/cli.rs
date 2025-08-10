@@ -9,6 +9,10 @@ use clap::{Parser, Subcommand};
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
+
+    /// Path to the configuration file.
+    #[arg(short, long, default_value = "lime.toml")]
+    pub config: Option<String>,
 }
 
 #[derive(Subcommand)]

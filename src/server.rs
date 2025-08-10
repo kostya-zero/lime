@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use axum::{
     Router,
-    extract::Path,
+    extract::{Path, State},
     http::{StatusCode, header},
     response::{Html, IntoResponse},
     routing::get,
@@ -9,8 +9,10 @@ use axum::{
 use std::path::PathBuf;
 use tokio::{fs, net::TcpListener};
 
-const HTML_NOT_FOUND: &str = include_str!("../static/not-found.html");
-const HTML_INTERNAL_ERROR: &str = include_str!("../static/internal-error.html");
+use crate::config::Config;
+
+const HTML_NOT_FOUND: &str = include_str!("../assets/not-found.html");
+const HTML_INTERNAL_ERROR: &str = include_str!("../assets/internal-error.html");
 
 const ALLOWED_ASSETS_TYPES: [&str; 38] = [
     "jpg", "png", "jpeg", "gif", "svg", "webp", "ico", "bmp", "tiff", "avif", "css", "js", "mjs",
@@ -18,14 +20,26 @@ const ALLOWED_ASSETS_TYPES: [&str; 38] = [
     "webm", "ogm", "mov", "zip", "tar", "gz", "rar", "7z", "pdf", "txt", "csv", "xml", "json",
 ];
 
-pub async fn start_server(port: u16) -> Result<()> {
-    let listener = TcpListener::bind(&format!("0.0.0.0:{port}"))
+#[derive(Clone)]
+pub struct AppState {
+    working_dir: String,
+    static_dir: String,
+}
+
+pub async fn start_server(config: &Config) -> Result<()> {
+    let listener = TcpListener::bind(&format!("{}:{}", config.host, config.port))
         .await
         .map_err(|e| anyhow!(e.to_string()))?;
 
+    let state = AppState {
+        working_dir: config.working_dir.clone(),
+        static_dir: config.static_dir.clone(),
+    };
+
     let router = Router::new()
         .route("/", get(handle_index))
-        .route("/{*path}", get(handle_wildcard));
+        .route("/{*path}", get(handle_wildcard))
+        .with_state(state);
 
     axum::serve(listener, router)
         .await
@@ -34,8 +48,8 @@ pub async fn start_server(port: u16) -> Result<()> {
     Ok(())
 }
 
-pub async fn handle_index() -> impl IntoResponse {
-    let path = PathBuf::from("index.html");
+pub async fn handle_index(State(state): State<AppState>) -> impl IntoResponse {
+    let path = PathBuf::from(state.working_dir).join("index.html");
     if !path.exists() {
         return (StatusCode::NOT_FOUND, Html(HTML_NOT_FOUND)).into_response();
     }
@@ -49,7 +63,10 @@ pub async fn handle_index() -> impl IntoResponse {
     (StatusCode::OK, Html(content)).into_response()
 }
 
-pub async fn handle_wildcard(Path(path): Path<String>) -> impl IntoResponse {
+pub async fn handle_wildcard(
+    Path(path): Path<String>,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
     println!("Requested path: {path}");
     let extension = PathBuf::from(&path)
         .extension()
@@ -59,15 +76,15 @@ pub async fn handle_wildcard(Path(path): Path<String>) -> impl IntoResponse {
 
     if ALLOWED_ASSETS_TYPES.contains(&extension.as_str()) {
         println!("Serving static: {path}");
-        return serve_static(&path).await.into_response();
+        return serve_static(&path, state.static_dir).await.into_response();
     }
 
     println!("Serving HTML file: {path}");
-    serve_html(&path).await.into_response()
+    serve_html(&path, state.working_dir).await.into_response()
 }
 
-async fn serve_html(path: &str) -> impl IntoResponse {
-    let mut html_path = PathBuf::from(path);
+async fn serve_html(path: &str, dir_path: String) -> impl IntoResponse {
+    let mut html_path = PathBuf::from(dir_path).join(path);
 
     if html_path.extension().is_none() {
         html_path.set_extension("html");
@@ -91,8 +108,8 @@ async fn serve_html(path: &str) -> impl IntoResponse {
     }
 }
 
-async fn serve_static(path: &str) -> impl IntoResponse {
-    let static_path = PathBuf::from("public/").join(path);
+async fn serve_static(path: &str, dir_path: String) -> impl IntoResponse {
+    let static_path = PathBuf::from(dir_path).join(path);
 
     if !static_path.exists() {
         return (StatusCode::NOT_FOUND, Html(HTML_NOT_FOUND)).into_response();

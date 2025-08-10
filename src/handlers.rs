@@ -1,10 +1,9 @@
 use anyhow::Result;
 
-use crate::server::start_server;
+use crate::{config::Config, server::start_server};
 
-pub async fn handle_serve() -> Result<()> {
-    let port: u16 = 3000;
-    start_server(port).await?;
+pub async fn handle_serve(config: &Config) -> Result<()> {
+    start_server(config).await?;
     Ok(())
 }
 
