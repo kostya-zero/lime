@@ -14,7 +14,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            host: "0.0.0.0".to_string(),
+            host: "127.0.0.1".to_string(),
             port: 3000,
             working_dir: ".".to_string(),
             static_dir: "./static".to_string(),
