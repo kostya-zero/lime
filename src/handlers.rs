@@ -7,6 +7,6 @@ pub async fn handle_serve(config: &Config) -> Result<()> {
     Ok(())
 }
 
-pub async fn handle_list() -> Result<()> {
+pub async fn handle_list(config: &Config) -> Result<()> {
     Ok(())
 }

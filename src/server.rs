@@ -8,8 +8,10 @@ use axum::{
 };
 use std::path::PathBuf;
 use tokio::{fs, net::TcpListener};
+use tracing::{debug, error, info, warn};
 
 use crate::config::Config;
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 const HTML_NOT_FOUND: &str = include_str!("../assets/not-found.html");
 const HTML_INTERNAL_ERROR: &str = include_str!("../assets/internal-error.html");
@@ -26,6 +28,13 @@ pub struct AppState {
     static_dir: String,
 }
 
+pub fn init_logging() {
+    tracing_subscriber::registry()
+        .with(EnvFilter::from_default_env())
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+}
+
 pub async fn start_server(config: &Config) -> Result<()> {
     let listener = TcpListener::bind(&format!("{}:{}", config.host, config.port))
         .await
@@ -40,6 +49,8 @@ pub async fn start_server(config: &Config) -> Result<()> {
         .route("/", get(handle_index))
         .route("/{*path}", get(handle_wildcard))
         .with_state(state);
+
+    init_logging();
 
     axum::serve(listener, router)
         .await
@@ -67,7 +78,7 @@ pub async fn handle_wildcard(
     Path(path): Path<String>,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
-    println!("Requested path: {path}");
+    info!(requested_path = %path, "Handling request");
     let extension = PathBuf::from(&path)
         .extension()
         .and_then(|e| e.to_str())
@@ -75,11 +86,11 @@ pub async fn handle_wildcard(
         .to_lowercase();
 
     if ALLOWED_ASSETS_TYPES.contains(&extension.as_str()) {
-        println!("Serving static: {path}");
+        debug!(path = %path, extension = %extension, "Serving static asset");
         return serve_static(&path, state.static_dir).await.into_response();
     }
 
-    println!("Serving HTML file: {path}");
+    debug!(path = %path, "Serving HTML file");
     serve_html(&path, state.working_dir).await.into_response()
 }
 
@@ -91,8 +102,10 @@ async fn serve_html(path: &str, dir_path: String) -> impl IntoResponse {
     }
 
     if html_path.exists() {
+        debug!(file = ?html_path, "Reading HTML file");
         let file = fs::read_to_string(html_path).await;
         if file.is_err() {
+            error!("Failed to read HTML file");
             return (StatusCode::INTERNAL_SERVER_ERROR, Html(HTML_INTERNAL_ERROR)).into_response();
         }
 
@@ -104,6 +117,7 @@ async fn serve_html(path: &str, dir_path: String) -> impl IntoResponse {
         )
             .into_response()
     } else {
+        warn!(path = %path, "HTML file not found");
         (StatusCode::NOT_FOUND, Html(HTML_NOT_FOUND)).into_response()
     }
 }
@@ -112,6 +126,7 @@ async fn serve_static(path: &str, dir_path: String) -> impl IntoResponse {
     let static_path = PathBuf::from(dir_path).join(path);
 
     if !static_path.exists() {
+        warn!(path = %path, "Static file not found");
         return (StatusCode::NOT_FOUND, Html(HTML_NOT_FOUND)).into_response();
     }
 
@@ -170,8 +185,12 @@ async fn serve_static(path: &str, dir_path: String) -> impl IntoResponse {
                 // If non of them matches
                 _ => "application/octet-stream",
             };
+            debug!(path = %path, mime_type = %mime_type, bytes = bytes.len(), "Serving static file");
             (StatusCode::OK, [(header::CONTENT_TYPE, mime_type)], bytes).into_response()
         }
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Html(HTML_INTERNAL_ERROR)).into_response(),
+        Err(e) => {
+            error!(path = %path, error = %e, "Failed to read static file");
+            (StatusCode::INTERNAL_SERVER_ERROR, Html(HTML_INTERNAL_ERROR)).into_response()
+        }
     }
 }
