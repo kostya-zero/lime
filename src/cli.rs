@@ -19,7 +19,4 @@ pub struct Cli {
 pub enum Commands {
     /// Start an HTML server.
     Serve,
-
-    /// See all pages that Lime has detected.
-    List,
 }

@@ -1,15 +1,11 @@
 use std::process::exit;
 
-use crate::{
-    cli::Cli,
-    config::load_config,
-    handlers::{handle_list, handle_serve},
-};
+use crate::{cli::Cli, commands::handle_serve, config::load_config};
 use clap::Parser;
 
 mod cli;
+mod commands;
 mod config;
-mod handlers;
 mod server;
 
 #[tokio::main]
@@ -21,7 +17,6 @@ async fn main() {
 
     let result = match cli.command {
         cli::Commands::Serve => handle_serve(&config).await,
-        cli::Commands::List => handle_list(&config).await,
     };
 
     if let Err(e) = result {
