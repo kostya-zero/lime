@@ -42,6 +42,13 @@ pub async fn start_server(config: &Config) -> Result<()> {
         "\u{1F34B} Lime Web Server v".bright_green().bold(),
         env!("CARGO_PKG_VERSION").bright_green().bold()
     );
+    if config.default {
+        println!(
+            "  {} {}",
+            "".yellow().bold(),
+            "In order to configure Lime, create 'lime.toml' file in the current directory.".bold()
+        );
+    }
     let listener = TcpListener::bind(&format!("{}:{}", config.host, config.port))
         .await
         .map_err(|e| anyhow!(e.to_string()))?;

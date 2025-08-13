@@ -9,6 +9,8 @@ pub struct Config {
     pub port: i32,
     pub working_dir: String,
     pub static_dir: String,
+    #[serde(skip)]
+    pub default: bool,
 }
 
 impl Default for Config {
@@ -18,6 +20,7 @@ impl Default for Config {
             port: 3000,
             working_dir: ".".to_string(),
             static_dir: "./static".to_string(),
+            default: true,
         }
     }
 }
@@ -25,7 +28,8 @@ impl Default for Config {
 pub fn load_config(path: &str) -> Result<Config> {
     let content = fs::read_to_string(path)
         .map_err(|e| anyhow::anyhow!("Failed to read config file {}: {}", path, e))?;
-    let config = toml::from_str::<Config>(&content)
+    let mut config = toml::from_str::<Config>(&content)
         .map_err(|e| anyhow::anyhow!("Failed to parse config file {}: {}", path, e))?;
+    config.default = false;
     Ok(config)
 }
