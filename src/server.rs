@@ -16,6 +16,7 @@ use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitEx
 
 const HTML_NOT_FOUND: &str = include_str!("../assets/not-found.html");
 const HTML_INTERNAL_ERROR: &str = include_str!("../assets/internal-error.html");
+const HTML_DEFAULT_INDEX: &str = include_str!("../assets/index-page.html");
 
 const ALLOWED_ASSETS_TYPES: [&str; 38] = [
     "jpg", "png", "jpeg", "gif", "svg", "webp", "ico", "bmp", "tiff", "avif", "css", "js", "mjs",
@@ -80,7 +81,7 @@ pub async fn start_server(config: &Config) -> Result<()> {
 pub async fn handle_index(State(state): State<AppState>) -> impl IntoResponse {
     let path = PathBuf::from(state.working_dir).join("index.html");
     if !path.exists() {
-        return (StatusCode::NOT_FOUND, Html(HTML_NOT_FOUND)).into_response();
+        return (StatusCode::OK, Html(HTML_DEFAULT_INDEX)).into_response();
     }
 
     let file = fs::read_to_string(path).await;
