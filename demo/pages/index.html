@@ -1,5 +1,115 @@
 <!DOCTYPE html>
-<html>
-    <head><title>Hello World</title></head>
-    <body><p>Hello World!</p></body>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Lime is Running</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Your Lime server is up and running.">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap" rel="stylesheet">
+  <style>
+    html, body {
+      min-height: 100svh;
+      background: #000;
+      color: #fff;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, "Helvetica Neue", Helvetica, sans-serif;
+      -moz-osx-font-smoothing: grayscale;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+      display: flex;
+      flex-direction: column;
+    }
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      animation: fadeIn 0.5s ease-out forwards;
+    }
+    .status-code {
+      font-size: 64px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #8dff7b;
+      animation: bounce 3s ease-in-out infinite;
+    }
+    .status-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: #dcdcdc;
+      margin-bottom: 0;
+      opacity: 0;
+      animation: fadeIn 0.5s ease-out forwards;
+      animation-delay: 0.2s;
+    }
+    .status-description {
+      font-size: 14px;
+      color: #b2b2b2;
+      margin-top: 3px;
+      max-width: 400px;
+      opacity: 0;
+      animation: fadeIn 0.5s ease-out forwards;
+      animation-delay: 0.4s;
+    }
+    a, a:active, a:focus {
+      background: none;
+      color: #cdcdcd;
+      font-weight: 500;
+      text-underline-offset: 3px;
+      outline: none;
+      box-shadow: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: color 0.2s ease;
+    }
+    a:hover {
+      color: #fff;
+    }
+    footer {
+      margin: 40px auto 10px;
+      text-align: center;
+      opacity: 0;
+      animation: fadeIn 0.5s ease-out forwards;
+      animation-delay: 1.0s;
+    }
+   .links {
+      display: flex;
+      gap: 20px;
+      margin-top: 20px;
+      opacity: 0;
+      animation: fadeIn 0.5s ease-out forwards;
+      animation-delay: 0.8s;
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <p class="status-code">🍋‍🟩</p>
+  <p class="status-title">This page is powered by Lime</p>
+  <p class="status-description">Lime is a lightweight HTML server that helps you think less about deployment of your HTML application. This is a demo page served to you by Lime server.</p>
+  <div class="links">
+    <a href="https://github.com/kostya-zero/lime" target="_blank" rel="noopener">Documentation</a>
+    <a href="https://github.com/kostya-zero/lime" target="_blank" rel="noopener">Repository</a>
+    <a href="https://github.com/kostya-zero/lime" target="_blank" rel="noopener">Support</a>
+  </div>
+</main>
+<footer>
+  <a href="https://github.com/kostya-zero/lime" target="_blank" rel="noopener">Powered By Lime 🍋‍🟩</a>
+</footer>
+</body>
 </html>
