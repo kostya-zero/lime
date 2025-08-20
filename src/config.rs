@@ -7,7 +7,7 @@ use serde::Deserialize;
 pub struct Config {
     pub host: String,
     pub port: i32,
-    pub working_dir: String,
+    pub pages_dir: String,
     pub static_dir: String,
     #[serde(skip)]
     pub default: bool,
@@ -18,7 +18,7 @@ impl Default for Config {
         Self {
             host: "127.0.0.1".to_string(),
             port: 3000,
-            working_dir: ".".to_string(),
+            pages_dir: "./pages".to_string(),
             static_dir: "./static".to_string(),
             default: true,
         }

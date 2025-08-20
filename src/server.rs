@@ -55,7 +55,7 @@ pub async fn start_server(config: &Config) -> Result<()> {
         .map_err(|e| anyhow!(e.to_string()))?;
 
     let state = AppState {
-        working_dir: config.working_dir.clone(),
+        working_dir: config.pages_dir.clone(),
         static_dir: config.static_dir.clone(),
     };
 
