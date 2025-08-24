@@ -30,7 +30,7 @@ pub struct AppState {
     static_dir: String,
 }
 
-pub fn init_logging() {
+fn init_logging() {
     tracing_subscriber::registry()
         .with(EnvFilter::from_default_env())
         .with(tracing_subscriber::fmt::layer())
