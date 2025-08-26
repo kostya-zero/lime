@@ -16,3 +16,12 @@ tokio = { version = "1.46.1", features = ["full"] }
 toml = "0.9.5"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+
+[profile.release]
+panic = "abort"
+opt-level = 3
+codegen-units = 1
+incremental = false
+lto = "thin"
+debug = 0
+strip = true
