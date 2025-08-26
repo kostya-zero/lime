@@ -120,31 +120,31 @@ async fn serve_html(path: &str, dir_path: String) -> impl IntoResponse {
         html_path.set_extension("html");
     }
 
-    if html_path.exists() {
-        debug!(file = ?html_path, "Reading HTML file");
-        let file = fs::read_to_string(html_path).await;
-        if file.is_err() {
-            error!("Failed to read HTML file");
-            return (StatusCode::INTERNAL_SERVER_ERROR, Html(HTML_INTERNAL_ERROR)).into_response();
-        }
-
-        let content = file.unwrap();
-        (
-            StatusCode::OK,
-            [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
-            Html(content),
-        )
-            .into_response()
-    } else {
+    if !fs::try_exists(&html_path).await.unwrap_or(false) {
         warn!(path = %path, "HTML file not found");
-        (StatusCode::NOT_FOUND, Html(HTML_NOT_FOUND)).into_response()
+        return (StatusCode::NOT_FOUND, Html(HTML_NOT_FOUND)).into_response();
     }
+
+    debug!(file = ?html_path, "Reading HTML file");
+    let file = fs::read_to_string(html_path).await;
+    if file.is_err() {
+        error!("Failed to read HTML file");
+        return (StatusCode::INTERNAL_SERVER_ERROR, Html(HTML_INTERNAL_ERROR)).into_response();
+    }
+
+    let content = file.unwrap();
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
+        Html(content),
+    )
+        .into_response()
 }
 
 async fn serve_static(path: &str, dir_path: String) -> impl IntoResponse {
     let static_path = PathBuf::from(dir_path).join(path);
 
-    if !static_path.exists() {
+    if !fs::try_exists(&static_path).await.unwrap_or(false) {
         warn!(path = %path, "Static file not found");
         return (StatusCode::NOT_FOUND, Html(HTML_NOT_FOUND)).into_response();
     }
