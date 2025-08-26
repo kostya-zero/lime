@@ -2,9 +2,6 @@ name: Clippy
 
 on: push
 
-env:
-  RUSTFLAGS: "-C linker=rust-lld"
-
 jobs:
   lint:
     strategy:
