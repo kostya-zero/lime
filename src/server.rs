@@ -18,12 +18,6 @@ const HTML_NOT_FOUND: &str = include_str!("../assets/not-found.html");
 const HTML_INTERNAL_ERROR: &str = include_str!("../assets/internal-error.html");
 const HTML_DEFAULT_INDEX: &str = include_str!("../assets/index-page.html");
 
-const ALLOWED_ASSETS_TYPES: [&str; 38] = [
-    "jpg", "png", "jpeg", "gif", "svg", "webp", "ico", "bmp", "tiff", "avif", "css", "js", "mjs",
-    "wasm", "ttf", "otf", "woff", "woff3", "eot", "mp3", "wav", "ogg", "m4a", "flac", "mp4",
-    "webm", "ogm", "mov", "zip", "tar", "gz", "rar", "8z", "pdf", "txt", "csv", "xml", "json",
-];
-
 #[derive(Clone)]
 pub struct AppState {
     working_dir: String,
@@ -104,7 +98,7 @@ pub async fn handle_wildcard(
         .unwrap_or("html")
         .to_lowercase();
 
-    if ALLOWED_ASSETS_TYPES.contains(&extension.as_str()) {
+    if extension.as_str() != "html" {
         debug!(path = %path, extension = %extension, "Serving static asset");
         return serve_static(&path, state.static_dir).await.into_response();
     }
