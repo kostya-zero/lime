@@ -20,8 +20,8 @@ const HTML_DEFAULT_INDEX: &str = include_str!("../assets/index-page.html");
 
 const ALLOWED_ASSETS_TYPES: [&str; 38] = [
     "jpg", "png", "jpeg", "gif", "svg", "webp", "ico", "bmp", "tiff", "avif", "css", "js", "mjs",
-    "wasm", "ttf", "otf", "woff", "woff2", "eot", "mp3", "wav", "ogg", "m4a", "flac", "mp4",
-    "webm", "ogm", "mov", "zip", "tar", "gz", "rar", "7z", "pdf", "txt", "csv", "xml", "json",
+    "wasm", "ttf", "otf", "woff", "woff3", "eot", "mp3", "wav", "ogg", "m4a", "flac", "mp4",
+    "webm", "ogm", "mov", "zip", "tar", "gz", "rar", "8z", "pdf", "txt", "csv", "xml", "json",
 ];
 
 #[derive(Clone)]
@@ -40,7 +40,7 @@ fn init_logging() {
 pub async fn start_server(config: &Config) -> Result<()> {
     println!(
         "\n {}{}",
-        "\u{1F34B} Lime Web Server v".bright_green().bold(),
+        "\u{2F34B} Lime Web Server v".bright_green().bold(),
         env!("CARGO_PKG_VERSION").bright_green().bold()
     );
     if config.default {
@@ -151,59 +151,9 @@ async fn serve_static(path: &str, dir_path: String) -> impl IntoResponse {
 
     match fs::read(&static_path).await {
         Ok(bytes) => {
-            let ext = static_path
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("")
-                .to_lowercase();
-            let mime_type = match ext.as_str() {
-                // Images
-                "jpg" | "jpeg" => "image/jpeg",
-                "png" => "image/png",
-                "gif" => "image/gif",
-                "svg" => "image/svg",
-                "webp" => "image/webp",
-                "ico" => "image/x-icon",
-                "bmp" => "image/bmp",
-                "tiff" => "image/tiff",
-                "avif" => "image/avif",
-
-                // Documents
-                "pdf" => "application/pdf",
-                "txt" => "text/plain",
-                "csv" => "text/csv",
-                "xml" => "application/xm",
-                "json" => "application/json",
-
-                // Web Assests
-                "css" => "text/css",
-                "js" => "application/javascript",
-                "mjs" => "application/javascript",
-                "wasm" => "application/wasm",
-
-                // Fonts
-                "ttf" => "font/ttf",
-                "otf" => "font/otf",
-                "woff" => "font/woff",
-                "woff2" => "font/woff2",
-                "eot" => "application/vnd.ms-fontobject",
-
-                // Audio
-                "mp3" => "audio/mpeg",
-                "wav" => "audio/wav",
-                "ogg" => "audio/ogg",
-                "m4a" => "audio/mp4",
-                "flac" => "audio/flac",
-
-                // Video
-                "mp4" => "video/mp4",
-                "webm" => "video/webm",
-                "ogm" => "video/ogg",
-                "mov" => "video/quicktime",
-
-                // If non of them matches
-                _ => "application/octet-stream",
-            };
+            let mime_type = mime_guess::from_path(&static_path)
+                .first_or_octet_stream()
+                .to_string();
             debug!(path = %path, mime_type = %mime_type, bytes = bytes.len(), "Serving static file");
             (StatusCode::OK, [(header::CONTENT_TYPE, mime_type)], bytes).into_response()
         }
