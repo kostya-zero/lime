@@ -1,13 +1,14 @@
 use anyhow::{Result, anyhow};
 use axum::{
     Router,
+    body::Body,
     extract::{Path, State},
-    http::{StatusCode, header},
-    response::{Html, IntoResponse},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
+    response::Response,
     routing::get,
 };
 use colored::Colorize;
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 use tokio::{fs, net::TcpListener};
 use tracing::{debug, error, info, warn};
 
@@ -20,8 +21,8 @@ const HTML_DEFAULT_INDEX: &str = include_str!("../assets/index-page.html");
 
 #[derive(Clone)]
 pub struct AppState {
-    working_dir: String,
-    static_dir: String,
+    pages_dir: PathBuf,
+    static_dir: PathBuf,
 }
 
 fn init_logging() {
@@ -44,14 +45,17 @@ pub async fn start_server(config: &Config) -> Result<()> {
             "In order to configure Lime, create 'lime.toml' file in the current directory.".bold()
         );
     }
+
     let listener = TcpListener::bind(&format!("{}:{}", config.host, config.port))
         .await
         .map_err(|e| anyhow!(e.to_string()))?;
 
-    let state = AppState {
-        working_dir: config.pages_dir.clone(),
-        static_dir: config.static_dir.clone(),
-    };
+    let pages_dir = PathBuf::from(&config.pages_dir);
+    let static_dir = PathBuf::from(&config.static_dir);
+    let state = Arc::new(AppState {
+        pages_dir,
+        static_dir,
+    });
 
     let router = Router::new()
         .route("/", get(handle_index))
@@ -72,25 +76,23 @@ pub async fn start_server(config: &Config) -> Result<()> {
     Ok(())
 }
 
-pub async fn handle_index(State(state): State<AppState>) -> impl IntoResponse {
-    let path = PathBuf::from(state.working_dir).join("index.html");
+pub async fn handle_index(State(state): State<Arc<AppState>>) -> Response {
+    let path = &state.pages_dir.join("index.html");
     if !path.exists() {
-        return (StatusCode::OK, Html(HTML_DEFAULT_INDEX)).into_response();
+        Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", "text/html")
+            .body(Body::from(HTML_DEFAULT_INDEX))
+            .unwrap()
+    } else {
+        serve_file(&state.pages_dir.join("index.html"), &state.pages_dir, true).await
     }
-
-    let file = fs::read_to_string(path).await;
-    if file.is_err() {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Html(HTML_INTERNAL_ERROR)).into_response();
-    }
-
-    let content = file.unwrap();
-    (StatusCode::OK, Html(content)).into_response()
 }
 
 pub async fn handle_wildcard(
     Path(path): Path<String>,
-    State(state): State<AppState>,
-) -> impl IntoResponse {
+    State(state): State<Arc<AppState>>,
+) -> Response {
     info!(requested_path = %path, "Handling request");
     let extension = PathBuf::from(&path)
         .extension()
@@ -100,60 +102,95 @@ pub async fn handle_wildcard(
 
     if extension.as_str() != "html" {
         debug!(path = %path, extension = %extension, "Serving static asset");
-        return serve_static(&path, state.static_dir).await.into_response();
+        serve_file(&state.static_dir.join(&path), &state.static_dir, false).await
+    } else {
+        debug!(path = %path, "Serving HTML file");
+        serve_html(&path, &state.pages_dir).await
     }
-
-    debug!(path = %path, "Serving HTML file");
-    serve_html(&path, state.working_dir).await.into_response()
 }
 
-async fn serve_html(path: &str, dir_path: String) -> impl IntoResponse {
-    let mut html_path = PathBuf::from(dir_path).join(path);
-
+async fn serve_html(path: &str, base_dir: &PathBuf) -> Response {
+    let mut html_path = base_dir.join(path);
     if html_path.extension().is_none() {
         html_path.set_extension("html");
     }
-
-    if !fs::try_exists(&html_path).await.unwrap_or(false) {
-        warn!(path = %path, "HTML file not found");
-        return (StatusCode::NOT_FOUND, Html(HTML_NOT_FOUND)).into_response();
-    }
-
-    debug!(file = ?html_path, "Reading HTML file");
-    let file = fs::read_to_string(html_path).await;
-    if file.is_err() {
-        error!("Failed to read HTML file");
-        return (StatusCode::INTERNAL_SERVER_ERROR, Html(HTML_INTERNAL_ERROR)).into_response();
-    }
-
-    let content = file.unwrap();
-    (
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
-        Html(content),
-    )
-        .into_response()
+    serve_file(&html_path, base_dir, true).await
 }
 
-async fn serve_static(path: &str, dir_path: String) -> impl IntoResponse {
-    let static_path = PathBuf::from(dir_path).join(path);
-
-    if !fs::try_exists(&static_path).await.unwrap_or(false) {
-        warn!(path = %path, "Static file not found");
-        return (StatusCode::NOT_FOUND, Html(HTML_NOT_FOUND)).into_response();
-    }
-
-    match fs::read(&static_path).await {
-        Ok(bytes) => {
-            let mime_type = mime_guess::from_path(&static_path)
-                .first_or_octet_stream()
-                .to_string();
-            debug!(path = %path, mime_type = %mime_type, bytes = bytes.len(), "Serving static file");
-            (StatusCode::OK, [(header::CONTENT_TYPE, mime_type)], bytes).into_response()
-        }
+async fn serve_file(file_path: &PathBuf, base_dir: &PathBuf, is_text: bool) -> Response {
+    let base_canonical = match fs::canonicalize(base_dir).await {
+        Ok(p) => p,
         Err(e) => {
-            error!(path = %path, error = %e, "Failed to read static file");
-            (StatusCode::INTERNAL_SERVER_ERROR, Html(HTML_INTERNAL_ERROR)).into_response()
+            error!("Failed to canonicalize base dir: {}", e);
+            return internal_error();
         }
+    };
+
+    let full_canonical = match fs::canonicalize(file_path).await {
+        Ok(p) => p,
+        Err(_) => return not_found(),
+    };
+
+    if !full_canonical.starts_with(&base_canonical) {
+        warn!("Path traversal attempt: {:?}", file_path);
+        return not_found();
     }
+
+    let metadata = match fs::metadata(&full_canonical).await {
+        Ok(m) => m,
+        Err(_) => return not_found(),
+    };
+
+    if metadata.is_dir() {
+        return not_found();
+    }
+
+    let content = if is_text {
+        match fs::read_to_string(&full_canonical).await {
+            Ok(s) => s.into_bytes(),
+            Err(e) => {
+                error!("failed to read text file: {}", e);
+                return internal_error();
+            }
+        }
+    } else {
+        match fs::read(&full_canonical).await {
+            Ok(b) => b,
+            Err(e) => {
+                error!("failed to read file: {}", e);
+                return internal_error();
+            }
+        }
+    };
+
+    let mime_type = mime_guess::from_path(&full_canonical)
+        .first_or_octet_stream()
+        .to_string();
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_str(&mime_type)
+            .unwrap_or(HeaderValue::from_static("application/octet-stream")),
+    );
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", &mime_type)
+        .body(Body::from(content))
+        .unwrap()
+}
+
+fn not_found() -> Response {
+    Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body(Body::from(HTML_NOT_FOUND))
+        .unwrap()
+}
+
+fn internal_error() -> Response {
+    Response::builder()
+        .status(StatusCode::INTERNAL_SERVER_ERROR)
+        .body(Body::from(HTML_INTERNAL_ERROR))
+        .unwrap()
 }
