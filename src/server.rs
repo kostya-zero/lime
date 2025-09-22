@@ -9,6 +9,7 @@ use axum::{
 };
 use colored::Colorize;
 use std::{path::PathBuf, sync::Arc};
+use axum::response::Html;
 use tokio::{fs, net::TcpListener};
 use tracing::{debug, error, info, warn};
 
@@ -128,21 +129,21 @@ async fn serve_file(file_path: &PathBuf, base_dir: &PathBuf, is_text: bool) -> R
 
     let full_canonical = match fs::canonicalize(file_path).await {
         Ok(p) => p,
-        Err(_) => return not_found(),
+        Err(_) => return not_found(base_dir).await,
     };
 
     if !full_canonical.starts_with(&base_canonical) {
         warn!("Path traversal attempt: {:?}", file_path);
-        return not_found();
+        return not_found(base_dir).await;
     }
 
     let metadata = match fs::metadata(&full_canonical).await {
         Ok(m) => m,
-        Err(_) => return not_found(),
+        Err(_) => return not_found(base_dir).await,
     };
 
     if metadata.is_dir() {
-        return not_found();
+        return not_found(base_dir).await;
     }
 
     let content = if is_text {
@@ -181,10 +182,29 @@ async fn serve_file(file_path: &PathBuf, base_dir: &PathBuf, is_text: bool) -> R
         .unwrap()
 }
 
-fn not_found() -> Response {
+async fn not_found(base_dir: &PathBuf) -> Response {
+    let not_found_html = base_dir.join("not-found.html");
+
+    if !not_found_html.exists() {
+        return Response::builder()
+            .header("Content-Type", "text/html")
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::from(HTML_NOT_FOUND))
+            .unwrap();
+    }
+
+    let content = match fs::read_to_string(&not_found_html).await {
+        Ok(s) => s.into_bytes(),
+        Err(e) => {
+            error!("failed to read text file: {}", e);
+            return internal_error();
+        }
+    };
+
     Response::builder()
         .status(StatusCode::NOT_FOUND)
-        .body(Body::from(HTML_NOT_FOUND))
+        .header("Content-Type", "text/html")
+        .body(Body::from(content))
         .unwrap()
 }
 
