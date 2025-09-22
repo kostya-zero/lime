@@ -9,7 +9,6 @@ use axum::{
 };
 use colored::Colorize;
 use std::{path::PathBuf, sync::Arc};
-use axum::response::Html;
 use tokio::{fs, net::TcpListener};
 use tracing::{debug, error, info, warn};
 
@@ -182,6 +181,7 @@ async fn serve_file(file_path: &PathBuf, base_dir: &PathBuf, is_text: bool) -> R
         .unwrap()
 }
 
+#[allow(clippy::ptr_arg)]
 async fn not_found(base_dir: &PathBuf) -> Response {
     let not_found_html = base_dir.join("not-found.html");
 
