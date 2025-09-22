@@ -210,6 +210,7 @@ async fn not_found(base_dir: &PathBuf) -> Response {
 
 fn internal_error() -> Response {
     Response::builder()
+        .header("Content-Type", "text/html")
         .status(StatusCode::INTERNAL_SERVER_ERROR)
         .body(Body::from(HTML_INTERNAL_ERROR))
         .unwrap()
