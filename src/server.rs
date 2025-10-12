@@ -122,7 +122,7 @@ async fn serve_file(file_path: &PathBuf, base_dir: &PathBuf, is_text: bool) -> R
         Ok(p) => p,
         Err(e) => {
             error!("Failed to canonicalize base dir: {}", e);
-            return internal_error();
+            return internal_error(base_dir).await;
         }
     };
 
@@ -150,7 +150,7 @@ async fn serve_file(file_path: &PathBuf, base_dir: &PathBuf, is_text: bool) -> R
             Ok(s) => s.into_bytes(),
             Err(e) => {
                 error!("failed to read text file: {}", e);
-                return internal_error();
+                return internal_error(base_dir).await;
             }
         }
     } else {
@@ -158,7 +158,7 @@ async fn serve_file(file_path: &PathBuf, base_dir: &PathBuf, is_text: bool) -> R
             Ok(b) => b,
             Err(e) => {
                 error!("failed to read file: {}", e);
-                return internal_error();
+                return internal_error(base_dir).await;
             }
         }
     };
@@ -181,7 +181,6 @@ async fn serve_file(file_path: &PathBuf, base_dir: &PathBuf, is_text: bool) -> R
         .unwrap()
 }
 
-#[allow(clippy::ptr_arg)]
 async fn not_found(base_dir: &PathBuf) -> Response {
     let not_found_html = base_dir.join("not-found.html");
 
@@ -197,7 +196,7 @@ async fn not_found(base_dir: &PathBuf) -> Response {
         Ok(s) => s.into_bytes(),
         Err(e) => {
             error!("failed to read text file: {}", e);
-            return internal_error();
+            return internal_error(base_dir).await;
         }
     };
 
@@ -208,7 +207,29 @@ async fn not_found(base_dir: &PathBuf) -> Response {
         .unwrap()
 }
 
-fn internal_error() -> Response {
+async fn internal_error(base_dir: &PathBuf) -> Response {
+    let not_found_html = base_dir.join("not-found.html");
+
+    if !not_found_html.exists() {
+        return default_internal_error().await;
+    }
+
+    let content = match fs::read_to_string(&not_found_html).await {
+        Ok(s) => s.into_bytes(),
+        Err(e) => {
+            error!("failed to read text file: {}", e);
+            return default_internal_error().await;
+        }
+    };
+
+    return Response::builder()
+        .header("Content-Type", "text/html")
+        .status(StatusCode::NOT_FOUND)
+        .body(Body::from(content))
+        .unwrap();
+}
+
+async fn default_internal_error() -> Response {
     Response::builder()
         .header("Content-Type", "text/html")
         .status(StatusCode::INTERNAL_SERVER_ERROR)
