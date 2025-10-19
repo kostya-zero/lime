@@ -207,6 +207,7 @@ async fn not_found(base_dir: &PathBuf) -> Response {
         .unwrap()
 }
 
+#[allow(clippy::ptr_arg)]
 async fn internal_error(base_dir: &PathBuf) -> Response {
     let not_found_html = base_dir.join("not-found.html");
 
@@ -222,11 +223,11 @@ async fn internal_error(base_dir: &PathBuf) -> Response {
         }
     };
 
-    return Response::builder()
+    Response::builder()
         .header("Content-Type", "text/html")
         .status(StatusCode::NOT_FOUND)
         .body(Body::from(content))
-        .unwrap();
+        .unwrap()
 }
 
 async fn default_internal_error() -> Response {
