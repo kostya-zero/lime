@@ -21,8 +21,7 @@ const HTML_DEFAULT_INDEX: &str = include_str!("../assets/index-page.html");
 
 #[derive(Clone)]
 pub struct AppState {
-    pages_dir: PathBuf,
-    static_dir: PathBuf,
+    working_dir: PathBuf,
 }
 
 fn init_logging() {
@@ -50,12 +49,8 @@ pub async fn start_server(config: &Config) -> Result<()> {
         .await
         .map_err(|e| anyhow!(e.to_string()))?;
 
-    let pages_dir = PathBuf::from(&config.pages_dir);
-    let static_dir = PathBuf::from(&config.static_dir);
-    let state = Arc::new(AppState {
-        pages_dir,
-        static_dir,
-    });
+    let working_dir = PathBuf::from(&config.working_dir);
+    let state = Arc::new(AppState { working_dir });
 
     let router = Router::new()
         .route("/", get(handle_index))
@@ -63,12 +58,7 @@ pub async fn start_server(config: &Config) -> Result<()> {
         .with_state(state);
 
     init_logging();
-    println!(
-        "    {} http://{}:{}\n",
-        "Available on:".bold(),
-        config.host,
-        config.port
-    );
+    println!("    Available on: http://{}:{}\n", config.host, config.port);
     axum::serve(listener, router)
         .await
         .map_err(|e| anyhow!(e.to_string()))?;
@@ -77,7 +67,7 @@ pub async fn start_server(config: &Config) -> Result<()> {
 }
 
 pub async fn handle_index(State(state): State<Arc<AppState>>) -> Response {
-    let path = &state.pages_dir.join("index.html");
+    let path = &state.working_dir.join("index.html");
     if !path.exists() {
         Response::builder()
             .status(StatusCode::OK)
@@ -85,7 +75,12 @@ pub async fn handle_index(State(state): State<Arc<AppState>>) -> Response {
             .body(Body::from(HTML_DEFAULT_INDEX))
             .unwrap()
     } else {
-        serve_file(&state.pages_dir.join("index.html"), &state.pages_dir, true).await
+        serve_file(
+            &state.working_dir.join("index.html"),
+            &state.working_dir,
+            true,
+        )
+        .await
     }
 }
 
@@ -102,10 +97,10 @@ pub async fn handle_wildcard(
 
     if extension.as_str() != "html" {
         debug!(path = %path, extension = %extension, "Serving static asset");
-        serve_file(&state.static_dir.join(&path), &state.static_dir, false).await
+        serve_file(&state.working_dir, &state.working_dir, false).await
     } else {
         debug!(path = %path, "Serving HTML file");
-        serve_html(&path, &state.pages_dir).await
+        serve_html(&path, &state.working_dir).await
     }
 }
 
